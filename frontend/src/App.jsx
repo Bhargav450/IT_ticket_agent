@@ -22,9 +22,11 @@ export default function App() {
     try {
       const data = await api.getIncidents();
       setIncidents(data);
-      if (data.length > 0 && !selectedIncidentId) {
-        setSelectedIncidentId(data[0].id);
-      }
+      // Only set initial selection if no incident has been selected yet
+      setSelectedIncidentId(prev => {
+        if (prev) return prev;
+        return data.length > 0 ? data[0].id : null;
+      });
     } catch (err) {
       console.error(err);
     }
