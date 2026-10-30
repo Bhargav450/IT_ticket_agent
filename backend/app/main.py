@@ -48,6 +48,22 @@ app.include_router(knowledge_router)
 app.include_router(infra_router)
 app.include_router(analytics_router)
 
+@app.get("/")
+@app.get("/api")
+def root():
+    return {
+        "message": "AegisOps Autonomous IT Support Agent API is running!",
+        "status": "healthy",
+        "interactive_docs": "/docs",
+        "endpoints": {
+            "incidents": "/api/incidents",
+            "infra_services": "/api/infra/services",
+            "knowledge_base": "/api/knowledge",
+            "analytics": "/api/analytics/summary",
+            "health": "/health"
+        }
+    }
+
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
