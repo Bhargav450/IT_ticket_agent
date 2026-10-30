@@ -14,3 +14,4 @@ class AgentStepLog(Base):
     tool_input = Column(JSON, nullable=True)
     tool_output = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+

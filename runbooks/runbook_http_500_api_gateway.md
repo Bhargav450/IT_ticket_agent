@@ -29,3 +29,4 @@
 1. Execute `probe_service_health(service="api-gateway", endpoint="/healthz")`. Expected HTTP Status: `200 OK`.
 2. Confirm error rate drops below 0.1% within 60 seconds.
 3. If still returning 500, check `auth-service` dependency.
+

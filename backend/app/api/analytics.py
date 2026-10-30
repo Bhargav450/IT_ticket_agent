@@ -47,3 +47,4 @@ def get_analytics_summary(db: Session = Depends(get_db)):
         "tool_usage": {name or "unspecified": count for name, count in tool_counts},
         "category_distribution": {cat or "OTHER": count for cat, count in cat_counts}
     }
+

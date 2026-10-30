@@ -187,3 +187,4 @@ export default function CreateIncidentModal({ isOpen, onClose, onCreate }) {
     </div>
   );
 }
+

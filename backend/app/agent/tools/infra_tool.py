@@ -20,3 +20,4 @@ def execute_service_restart(service_name: str) -> Dict[str, Any]:
 def execute_flush_db_pool(database_name: str) -> Dict[str, Any]:
     """Risky action: Flushes all active and idle database connection pool slots."""
     return infra_simulator.flush_connection_pool(database_name)
+

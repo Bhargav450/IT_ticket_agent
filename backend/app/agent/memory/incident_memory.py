@@ -59,3 +59,4 @@ class IncidentMemoryStore:
         return results
 
 incident_memory = IncidentMemoryStore()
+

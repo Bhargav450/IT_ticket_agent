@@ -18,3 +18,4 @@ def query_db_diagnostics(database_name: str = "order-db") -> Dict[str, Any]:
         "query_latency_ms": service.get("latency_ms", 0.0),
         "is_saturated": service.get("active_connections", 0) >= service.get("max_connections", 100) * 0.8
     }
+

@@ -102,3 +102,4 @@ export default function HumanApprovalModal({ incident, onApprove, isProcessing }
     </div>
   );
 }
+

@@ -34,14 +34,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API Routers
-app.include_router(auth_router, prefix=settings.API_V1_STR)
-app.include_router(incidents_router, prefix=settings.API_V1_STR)
-app.include_router(knowledge_router, prefix=settings.API_V1_STR)
-app.include_router(infra_router, prefix=settings.API_V1_STR)
-app.include_router(analytics_router, prefix=settings.API_V1_STR)
+# Register API Routers with /api prefix
+app.include_router(auth_router, prefix="/api")
+app.include_router(incidents_router, prefix="/api")
+app.include_router(knowledge_router, prefix="/api")
+app.include_router(infra_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
+
+# Also register directly so /incidents and /api/incidents both work
+app.include_router(auth_router)
+app.include_router(incidents_router)
+app.include_router(knowledge_router)
+app.include_router(infra_router)
+app.include_router(analytics_router)
 
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {
         "status": "healthy",

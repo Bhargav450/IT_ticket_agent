@@ -143,3 +143,4 @@ export default function AgentExecutionStream({ steps, currentStatus }) {
     </div>
   );
 }
+

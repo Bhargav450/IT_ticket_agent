@@ -182,3 +182,4 @@ export default function IncidentList({ incidents, selectedId, onSelectIncident }
     </div>
   );
 }
+

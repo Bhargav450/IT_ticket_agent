@@ -84,3 +84,4 @@ def seed_database(db: Session):
             db.add(new_inc)
     
     db.commit()
+

@@ -12,6 +12,7 @@ from app.agent.runner import run_agent_for_incident, resume_agent_with_approval
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
 @router.get("", response_model=List[IncidentResponse])
+@router.get("/", response_model=List[IncidentResponse])
 def list_incidents(status: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(Incident)
     if status:
@@ -26,6 +27,7 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
     return inc
 
 @router.post("", response_model=IncidentResponse)
+@router.post("/", response_model=IncidentResponse)
 def create_incident(
     req: IncidentCreate,
     background_tasks: BackgroundTasks,
@@ -47,7 +49,6 @@ def create_incident(
     db.refresh(incident)
 
     if auto_trigger:
-        # Run agent
         run_agent_for_incident(db, incident.id)
         db.refresh(incident)
 

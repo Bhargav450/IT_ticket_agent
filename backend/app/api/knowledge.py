@@ -12,10 +12,12 @@ from app.services.rag_engine import rag_engine
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 @router.get("", response_model=List[KnowledgeDocResponse])
+@router.get("/", response_model=List[KnowledgeDocResponse])
 def list_knowledge_documents(db: Session = Depends(get_db)):
     return db.query(KnowledgeDocument).order_by(KnowledgeDocument.created_at.desc()).all()
 
 @router.post("/upload", response_model=KnowledgeDocResponse)
+@router.post("/upload/", response_model=KnowledgeDocResponse)
 async def upload_document(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
@@ -46,6 +48,7 @@ async def upload_document(
             os.remove(tmp_path)
 
 @router.post("/search", response_model=RAGQueryResult)
+@router.post("/search/", response_model=RAGQueryResult)
 def search_knowledge(req: RAGQueryRequest, db: Session = Depends(get_db)):
     citations = rag_engine.search(db, req.query, limit=req.limit or 3)
     return RAGQueryResult(

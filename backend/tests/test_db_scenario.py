@@ -50,3 +50,4 @@ def test_database_incident_lifecycle():
 
 if __name__ == "__main__":
     test_database_incident_lifecycle()
+

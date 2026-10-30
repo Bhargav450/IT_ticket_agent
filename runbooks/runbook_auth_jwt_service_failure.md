@@ -27,3 +27,4 @@
 ## Verification Step
 1. Probe `/auth/health` endpoint.
 2. Issue a test JWT verification request. Status must be 200 OK.
+

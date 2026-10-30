@@ -23,3 +23,4 @@ class DocumentChunk(Base):
     # Stored embedding vector as float list, allowing both pure vector search and hybrid text search
     embedding = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+

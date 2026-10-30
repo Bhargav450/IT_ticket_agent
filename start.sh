@@ -1,53 +1,35 @@
 #!/usr/bin/env bash
 set -e
 
-# Detect standard macOS paths (Homebrew and NVM)
-if [ -d "$HOME/.nvm/versions/node" ]; then
-    LATEST_NODE=$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -n 1)
-    if [ -n "$LATEST_NODE" ]; then
-        export PATH="$HOME/.nvm/versions/node/$LATEST_NODE/bin:$PATH"
-    fi
-fi
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-
 echo "=================================================================="
 echo "  🚀 Starting AegisOps: Autonomous IT Support Agent (LangGraph)   "
 echo "=================================================================="
 
-# Ensure ports 8000 and 5173 are free
-if lsof -ti :8000 >/dev/null 2>&1; then
-    echo "[!] Port 8000 is occupied. Freeing port 8000..."
-    kill -9 $(lsof -ti :8000) 2>/dev/null || true
-fi
-if lsof -ti :5173 >/dev/null 2>&1; then
-    echo "[!] Port 5173 is occupied. Freeing port 5173..."
-    kill -9 $(lsof -ti :5173) 2>/dev/null || true
-fi
-
-# Check Python Virtual Environment
+# Check Python venv
 if [ ! -d "venv" ]; then
-    echo "[*] Initializing Python virtual environment..."
+    echo "Creating virtual environment..."
     python3 -m venv venv
     ./venv/bin/pip install -r backend/requirements.txt
 fi
 
-# Check Ollama Status
+# Check Ollama
 if command -v ollama >/dev/null 2>&1; then
-    if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
-        echo "[✓] Ollama service is active on http://localhost:11434"
+    echo "[✓] Ollama found."
+    if ! curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+        echo "[!] Notice: Ollama service is not currently running on port 11434."
+        echo "    To run with live local LLM, start Ollama in another terminal:"
+        echo "    $ ollama serve"
+        echo "    $ ollama pull llama3.2"
+        echo "    (The system will automatically use the built-in reasoning engine until Ollama is up)"
     else
-        echo "[i] Ollama is installed but not currently active on port 11434."
-        echo "    The agent will run with its built-in expert reasoning engine."
-        echo "    (Optional: start 'ollama serve' in another tab anytime for live LLM)"
+        echo "[✓] Ollama local service is active and responsive on http://localhost:11434"
     fi
-else
-    echo "[i] Ollama not found. Using built-in local reasoning engine."
 fi
 
-# Clean exit handler
+# Trap SIGINT / SIGTERM to kill background children
 cleanup() {
     echo ""
-    echo "Shutting down AegisOps..."
+    echo "Shutting down AegisOps services..."
     kill $(jobs -p) 2>/dev/null || true
     exit 0
 }
@@ -55,33 +37,28 @@ trap cleanup SIGINT SIGTERM
 
 # Start FastAPI Backend
 echo ""
-echo "[*] Launching Backend on http://localhost:8000 ..."
-PYTHONPATH=backend ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+echo "[*] Launching FastAPI Backend on http://localhost:8000 ..."
+PYTHONPATH=backend ./venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
-# Wait for backend initialization
+# Wait for backend health
 sleep 2
 
 # Start React Frontend
-echo "[*] Launching Frontend Dashboard on http://localhost:5173 ..."
+echo "[*] Launching React Dashboard on http://localhost:5173 ..."
 cd frontend
-npm run dev -- --host 127.0.0.1 --port 5173 &
+npm run dev -- --host &
 FRONTEND_PID=$!
 cd ..
 
-sleep 2
-
-# Auto-open browser on macOS
-if command -v open >/dev/null 2>&1; then
-    open "http://localhost:5173" 2>/dev/null || true
-fi
-
 echo ""
 echo "=================================================================="
-echo "  ✅ AegisOps Command Center is running!"
-echo "  🌐 Dashboard: http://localhost:5173"
-echo "  🔌 API Docs:  http://localhost:8000/docs"
+echo "  ✅ AegisOps Command Center is LIVE!"
+echo "  🌐 Frontend Dashboard: http://localhost:5173"
+echo "  🔌 Backend API Docs:   http://localhost:8000/docs"
+echo "  🤖 Agent LLM Engine:   Ollama (llama3.2 / fallback)"
 echo "=================================================================="
 echo "Press Ctrl+C to stop all services."
 
 wait
+

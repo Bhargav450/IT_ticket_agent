@@ -4,3 +4,4 @@ from app.models.knowledge import KnowledgeDocument, DocumentChunk
 from app.models.audit import AgentStepLog
 
 __all__ = ["User", "Incident", "KnowledgeDocument", "DocumentChunk", "AgentStepLog"]
+

@@ -10,3 +10,4 @@ def query_application_logs(service_name: Optional[str] = None, level: Optional[s
         "log_count": len(logs),
         "logs": logs
     }
+

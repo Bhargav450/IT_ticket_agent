@@ -28,3 +28,4 @@
 1. Check `query_db_diagnostics` again; verify `active_connections` < 70% threshold.
 2. Verify latency on synthetic ping query `SELECT 1` is < 5ms.
 3. Ensure no new `PoolTimeout` errors in application logs.
+

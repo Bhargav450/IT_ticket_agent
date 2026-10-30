@@ -36,3 +36,4 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         user_name=user.full_name or user.email,
         role=user.role
     )
+
