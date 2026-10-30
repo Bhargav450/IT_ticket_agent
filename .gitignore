@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+.env
+.pytest_cache/

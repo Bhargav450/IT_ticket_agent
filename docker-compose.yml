@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # FastAPI LangGraph Autonomous Agent Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: aegisops-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./it_support_agent.db
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=llama3.2
+      - SECRET_KEY=super-secret-it-support-agent-jwt-key-32chars
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./backend/it_support_agent.db:/app/backend/it_support_agent.db
+      - ./runbooks:/app/runbooks
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # React 18 Ops Command Center UI
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: aegisops-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Optional PostgreSQL with pgvector for production vector storage
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aegisops-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: it_agent
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: it_support_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    profiles:
+      - production
+
+  # Optional Redis for distributed workers
+  redis:
+    image: redis:7-alpine
+    container_name: aegisops-redis
+    ports:
+      - "6379:6379"
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
