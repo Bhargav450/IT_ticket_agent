@@ -1,0 +1,46 @@
+services:
+  # 1. FastAPI Autonomous Agent Backend
+  - type: web
+    name: aegisops-backend
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: backend
+      - key: DATABASE_URL
+        value: sqlite:///./it_support_agent.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ZAMMAD_URL
+        value: http://localhost:8080
+      - key: ZAMMAD_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        value: http://localhost:11434
+
+  # 2. React Frontend Static Site
+  - type: web
+    name: aegisops-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: aegisops-backend
+          property: host
+

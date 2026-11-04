@@ -28,6 +28,7 @@ class IncidentResponse(BaseModel):
     assigned_agent: str
     root_cause_analysis: Optional[str] = None
     rag_sources: Optional[List[Any]] = []
+    zammad_ticket_id: Optional[int] = None
     proposed_action: Optional[str] = None
     action_risk_level: Optional[str] = "LOW"
     human_approval_required: bool = False
@@ -42,3 +43,4 @@ class IncidentResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
+    zammad_ticket_id: Optional[int] = None

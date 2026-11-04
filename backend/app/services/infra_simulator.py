@@ -154,6 +154,46 @@ class InfraSimulator:
                 "stack_trace": "jose.exceptions.JWTError: Signature verification failed. JWKS certificate rotation missing in local in-memory cache."
             })
             return {"status": "triggered", "scenario": scenario, "service": "auth-service"}
+
+        elif scenario in ["redis_cache_latency", "redis_memory_spike"]:
+            self.services["redis-cache"]["status"] = "DEGRADED"
+            self.services["redis-cache"]["memory_percent"] = 94.6
+            self.services["redis-cache"]["latency_ms"] = 84.5
+            self.services["redis-cache"]["error_rate_percent"] = 12.0
+            self.services["redis-cache"]["endpoints"]["PING"] = 500
+            
+            self.logs.append({
+                "timestamp": timestamp,
+                "service": "redis-cache",
+                "level": "WARNING",
+                "message": "Redis memory saturation: 94.6% allocated. OOM eviction policy active, maxmemory-policy allkeys-lru thrashing.",
+                "stack_trace": "redis.exceptions.ResponseError: OOM command not allowed when used memory > 'maxmemory'."
+            })
+            return {"status": "triggered", "scenario": scenario, "service": "redis-cache"}
+
+        elif scenario in ["payment_gateway_timeout", "payment_504"]:
+            self.services["payment-gateway"]["status"] = "CRITICAL"
+            self.services["payment-gateway"]["latency_ms"] = 32000.0
+            self.services["payment-gateway"]["error_rate_percent"] = 52.8
+            self.services["payment-gateway"]["endpoints"]["/health"] = 504
+            
+            self.logs.extend([
+                {
+                    "timestamp": timestamp,
+                    "service": "payment-gateway",
+                    "level": "ERROR",
+                    "message": "HTTP 504 Gateway Timeout: Upstream banking API webhook acknowledgement timeout after 30000ms.",
+                    "stack_trace": "urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='api.stripe.com', port=443): Read timed out."
+                },
+                {
+                    "timestamp": timestamp,
+                    "service": "payment-gateway",
+                    "level": "CRITICAL",
+                    "message": "Payment processing worker deadlock. 44 in-flight transaction threads stalled.",
+                    "stack_trace": "SystemError: Worker process deadlock in payment-worker-03"
+                }
+            ])
+            return {"status": "triggered", "scenario": scenario, "service": "payment-gateway"}
         
         return {"status": "unknown scenario"}
 
@@ -216,11 +256,19 @@ class InfraSimulator:
         return {"success": True, "database": database_name, "active_connections": 12, "status": "HEALTHY"}
 
     def clear_cache(self, service_name: str) -> Dict[str, Any]:
+        if service_name in self.services:
+            self.services[service_name]["status"] = "HEALTHY"
+            self.services[service_name]["memory_percent"] = 38.0
+            self.services[service_name]["latency_ms"] = 1.2
+            self.services[service_name]["error_rate_percent"] = 0.0
+            for ep in self.services[service_name].get("endpoints", {}):
+                self.services[service_name]["endpoints"][ep] = 200
+
         self.logs.append({
             "timestamp": datetime.utcnow().isoformat(),
             "service": service_name,
             "level": "INFO",
-            "message": f"Cache purged on '{service_name}'. Cache keys invalidated."
+            "message": f"Cache purged on '{service_name}'. Cache keys invalidated and memory reclaimed."
         })
         return {"success": True, "service": service_name, "action": "cache_cleared"}
 

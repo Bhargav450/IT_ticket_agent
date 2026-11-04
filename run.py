@@ -1,6 +1,11 @@
 import sys
 import os
 
+# Force unbuffered stdout/stderr so all print() calls appear immediately in logs
+os.environ["PYTHONUNBUFFERED"] = "1"
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # 1. Automatically switch to the project's virtualenv python if running with another Python
 project_dir = os.path.dirname(os.path.abspath(__file__))
 venv_python = os.path.join(project_dir, "venv", "bin", "python")

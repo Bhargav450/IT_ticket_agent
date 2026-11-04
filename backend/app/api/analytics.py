@@ -48,3 +48,10 @@ def get_analytics_summary(db: Session = Depends(get_db)):
         "category_distribution": {cat or "OTHER": count for cat, count in cat_counts}
     }
 
+@router.get("/benchmark")
+@router.post("/benchmark/run")
+def trigger_accuracy_benchmark(db: Session = Depends(get_db)):
+    """Runs the comprehensive accuracy benchmark suite across all operational use cases."""
+    from app.services.benchmark_suite import run_benchmark_evaluation
+    return run_benchmark_evaluation(db)
+

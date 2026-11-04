@@ -44,10 +44,9 @@ def supervisor_router(state: ITSupportState) -> Literal["triage", "knowledge", "
     
     # 4. Resolution phase
     if not state.get("action_executed"):
-        if state.get("human_approval_required") and state.get("human_approval_status") != "APPROVED":
+        if state.get("human_approval_status") == "PENDING":
             if state.get("proposed_action"):
                 return "end" # Checkpointed / paused waiting for human authorization
-            return "resolution"
         return "resolution"
     
     # 5. Verification phase

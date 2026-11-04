@@ -11,4 +11,6 @@ frontend/dist/
 .DS_Store
 .env
 .pytest_cache/
+zammad-docker-compose/
+
 

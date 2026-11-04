@@ -29,6 +29,7 @@ class ITSupportState(TypedDict, total=False):
     diagnostic_findings: Dict[str, Any]
     root_cause: str
     root_cause_confidence: float
+    resolution_guidance: Optional[str]
     
     # Proposed Remediation & Risk Analysis
     proposed_action: str

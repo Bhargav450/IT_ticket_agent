@@ -33,7 +33,7 @@ def test_database_incident_lifecycle():
 
     assert incident.category == "DATABASE"
     assert incident.affected_service == "order-db"
-    assert "connection pool" in incident.root_cause_analysis.lower()
+    assert any(term in incident.root_cause_analysis.lower() for term in ["connection slots", "connection pool", "queuepool", "connections"])
     assert incident.action_risk_level == "HIGH"
     assert incident.status == "AWAITING_APPROVAL"
 

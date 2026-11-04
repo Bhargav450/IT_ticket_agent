@@ -28,6 +28,11 @@ try:
 finally:
     db.close()
 
+# ── Startup diagnostics ────────────────────────────────────────────────────────
+print(f"[STARTUP] ZAMMAD_URL   : {settings.ZAMMAD_URL}", flush=True)
+print(f"[STARTUP] ZAMMAD_TOKEN : {'SET ✅' if settings.ZAMMAD_TOKEN else 'NOT SET ❌'}", flush=True)
+# ──────────────────────────────────────────────────────────────────────────────
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -72,7 +77,6 @@ def health_check():
         "ollama_endpoint": settings.OLLAMA_BASE_URL
     }
 
-# Explicit top-level incident endpoints to guarantee direct matching on all paths
 @app.get("/api/incidents", response_model=List[IncidentResponse])
 @app.get("/api/incidents/", response_model=List[IncidentResponse])
 @app.get("/incidents", response_model=List[IncidentResponse])
@@ -83,35 +87,9 @@ def get_incidents_direct(status: Optional[str] = None, db: Session = Depends(get
         query = query.filter(Incident.status == status)
     return query.order_by(Incident.created_at.desc()).all()
 
-@app.post("/api/incidents", response_model=IncidentResponse)
-@app.post("/api/incidents/", response_model=IncidentResponse)
-@app.post("/incidents", response_model=IncidentResponse)
-@app.post("/incidents/", response_model=IncidentResponse)
-def create_incident_direct(
-    req: IncidentCreate,
-    background_tasks: BackgroundTasks,
-    auto_trigger: bool = True,
-    db: Session = Depends(get_db)
-):
-    ticket_num = f"INC-2026-{random.randint(200, 999)}"
-    incident = Incident(
-        ticket_number=ticket_num,
-        title=req.title,
-        description=req.description,
-        reporter_email=req.reporter_email or "employee@enterprise.io",
-        affected_service=req.affected_service,
-        severity=req.severity or "P2_HIGH",
-        status="OPEN"
-    )
-    db.add(incident)
-    db.commit()
-    db.refresh(incident)
-
-    if auto_trigger:
-        run_agent_for_incident(db, incident.id)
-        db.refresh(incident)
-
-    return incident
+# NOTE: POST /api/incidents is intentionally handled ONLY by incidents_router
+# (backend/app/api/incidents.py → create_incident) which calls create_zammad_ticket.
+# Do NOT add a duplicate POST handler here — it would bypass Zammad integration.
 
 # Register all Routers with /api prefix
 app.include_router(auth_router, prefix="/api")

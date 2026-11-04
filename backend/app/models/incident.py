@@ -18,6 +18,7 @@ class Incident(Base):
     affected_service = Column(String, nullable=True) # api-gateway, order-db, auth-service, etc.
     reporter_email = Column(String, default="employee@enterprise.io")
     assigned_agent = Column(String, default="Autonomous IT Support Agent")
+    zammad_ticket_id = Column(Integer, nullable=True)
 
     # Reasoning & RAG
     root_cause_analysis = Column(Text, nullable=True)

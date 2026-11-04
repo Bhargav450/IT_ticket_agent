@@ -8,6 +8,7 @@ from app.models.audit import AgentStepLog
 from app.schemas.incident import IncidentCreate, IncidentResponse, IncidentApprovalRequest
 from app.schemas.agent import AgentStepLogResponse
 from app.agent.runner import run_agent_for_incident, resume_agent_with_approval
+from app.services.zammad_client import create_zammad_ticket
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -34,24 +35,27 @@ def create_incident(
     auto_trigger: bool = True,
     db: Session = Depends(get_db)
 ):
-    ticket_num = f"INC-2026-{random.randint(200, 999)}"
+     # ✅ NEW: Create ticket in Zammad first
+    zammad_res = create_zammad_ticket(req.title, req.description, req.reporter_email)
+    zammad_id = zammad_res.get("id")         # e.g. 42
+    zammad_number = zammad_res.get("number") # e.g. "10042"
     incident = Incident(
-        ticket_number=ticket_num,
+        ticket_number=zammad_number or f"INC-2026-{random.randint(200,999)}",
         title=req.title,
         description=req.description,
         reporter_email=req.reporter_email or "employee@enterprise.io",
-        affected_service=req.affected_service,
         severity=req.severity or "P2_HIGH",
-        status="OPEN"
+        status="OPEN",
+        zammad_ticket_id=zammad_id  # Store so we can update later
     )
     db.add(incident)
     db.commit()
     db.refresh(incident)
-
+    
     if auto_trigger:
         run_agent_for_incident(db, incident.id)
         db.refresh(incident)
-
+    
     return incident
 
 @router.post("/{incident_id}/trigger-agent")

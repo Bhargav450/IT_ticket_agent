@@ -194,7 +194,7 @@ export default function IncidentDetail({
               Verification & Final Resolution Summary
             </h3>
           </div>
-          <p className="text-xs text-emerald-200/90 leading-relaxed font-sans mb-3">
+          <p className="text-xs text-emerald-200/90 leading-relaxed font-sans mb-3 whitespace-pre-wrap">
             {incident.resolution_notes}
           </p>
           {incident.verification_details && (

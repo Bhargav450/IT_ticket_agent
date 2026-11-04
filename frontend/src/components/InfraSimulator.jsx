@@ -114,50 +114,80 @@ export default function InfraSimulator() {
         </div>
 
         {/* Chaos Injection Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-slate-800">
           <button
             onClick={() => handleSimulate('http_500_gateway', 'HTTP 500 API Gateway Deadlock')}
             disabled={isLoading}
-            className="flex items-center justify-between p-3 rounded-lg border border-rose-500/30 bg-rose-950/20 hover:bg-rose-950/40 text-left transition-all group"
+            className="flex flex-col justify-between p-3 rounded-lg border border-rose-500/30 bg-rose-950/20 hover:bg-rose-950/40 text-left transition-all group"
           >
             <div>
               <div className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
                 <Flame className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-                <span>Simulate HTTP 500 Outage</span>
+                <span>Simulate Gateway 500</span>
               </div>
-              <span className="text-[11px] text-rose-300/70 block mt-0.5">Saturates api-gateway worker pool</span>
+              <span className="text-[11px] text-rose-300/70 block mt-0.5">Worker pool deadlock</span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">P1</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 mt-2 self-start rounded bg-rose-500/20 text-rose-300">P1 CRITICAL</span>
           </button>
 
           <button
             onClick={() => handleSimulate('db_pool_exhaustion', 'Database Connection Pool Exhaustion')}
             disabled={isLoading}
-            className="flex items-center justify-between p-3 rounded-lg border border-amber-500/30 bg-amber-950/20 hover:bg-amber-950/40 text-left transition-all group"
+            className="flex flex-col justify-between p-3 rounded-lg border border-amber-500/30 bg-amber-950/20 hover:bg-amber-950/40 text-left transition-all group"
           >
             <div>
               <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                 <Database className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>Simulate DB Pool Exhaustion</span>
+                <span>Simulate DB Pool Full</span>
               </div>
-              <span className="text-[11px] text-amber-300/70 block mt-0.5">Exhausts 100/100 connection slots</span>
+              <span className="text-[11px] text-amber-300/70 block mt-0.5">100/100 slots saturated</span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">P2</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 mt-2 self-start rounded bg-amber-500/20 text-amber-300">P2 HIGH</span>
           </button>
 
           <button
             onClick={() => handleSimulate('auth_token_failure', 'Auth Token Verification Failure')}
             disabled={isLoading}
-            className="flex items-center justify-between p-3 rounded-lg border border-purple-500/30 bg-purple-950/20 hover:bg-purple-950/40 text-left transition-all group"
+            className="flex flex-col justify-between p-3 rounded-lg border border-purple-500/30 bg-purple-950/20 hover:bg-purple-950/40 text-left transition-all group"
           >
             <div>
               <div className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span>Simulate Auth Token Failure</span>
+                <span>Simulate Auth 401</span>
               </div>
-              <span className="text-[11px] text-purple-300/70 block mt-0.5">Simulates JWKS key rotation cache desync</span>
+              <span className="text-[11px] text-purple-300/70 block mt-0.5">JWKS key rotation desync</span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">P2</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 mt-2 self-start rounded bg-purple-500/20 text-purple-300">P2 HIGH</span>
+          </button>
+
+          <button
+            onClick={() => handleSimulate('redis_cache_latency', 'Redis Memory & Latency Spike')}
+            disabled={isLoading}
+            className="flex flex-col justify-between p-3 rounded-lg border border-pink-500/30 bg-pink-950/20 hover:bg-pink-950/40 text-left transition-all group"
+          >
+            <div>
+              <div className="text-xs font-bold text-pink-300 flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span>Simulate Redis OOM</span>
+              </div>
+              <span className="text-[11px] text-pink-300/70 block mt-0.5">95% mem, LRU thrashing</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 mt-2 self-start rounded bg-pink-500/20 text-pink-300">P3 MEDIUM</span>
+          </button>
+
+          <button
+            onClick={() => handleSimulate('payment_gateway_timeout', 'Payment Gateway 504 Timeout')}
+            disabled={isLoading}
+            className="flex flex-col justify-between p-3 rounded-lg border border-rose-500/30 bg-rose-950/20 hover:bg-rose-950/40 text-left transition-all group"
+          >
+            <div>
+              <div className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                <span>Simulate Payment 504</span>
+              </div>
+              <span className="text-[11px] text-rose-300/70 block mt-0.5">Checkout deadlock 30s</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 mt-2 self-start rounded bg-rose-500/20 text-rose-300">P1 CRITICAL</span>
           </button>
         </div>
 

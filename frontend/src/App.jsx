@@ -6,9 +6,12 @@ import InfraSimulator from './components/InfraSimulator';
 import KnowledgeBase from './components/KnowledgeBase';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import CreateIncidentModal from './components/CreateIncidentModal';
-import { api } from './api/client';
+import EmployeePortal from './components/EmployeePortal';
+import Login from './components/Login';
+import { api, auth } from './api/client';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => auth.getUser());
   const [activeTab, setActiveTab] = useState('incidents');
   const [incidents, setIncidents] = useState([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState(null);
@@ -46,20 +49,47 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchIncidents();
-    const interval = setInterval(fetchIncidents, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (selectedIncidentId) {
-      fetchDetail(selectedIncidentId);
-      const interval = setInterval(() => fetchDetail(selectedIncidentId), 2500);
+    if (currentUser) {
+      fetchIncidents();
+      const interval = setInterval(fetchIncidents, 3000);
       return () => clearInterval(interval);
     }
-  }, [selectedIncidentId]);
+  }, [currentUser]);
 
-  // Trigger Autonomous Agent on Incident
+  useEffect(() => {
+    if (!currentUser || !selectedIncidentId) return;
+    fetchDetail(selectedIncidentId);
+    // Stop polling once the incident reaches a terminal state
+    const isTerminal = selectedIncident && ['RESOLVED', 'ESCALATED', 'CLOSED'].includes(selectedIncident.status);
+    if (isTerminal) return;
+    const interval = setInterval(() => fetchDetail(selectedIncidentId), 2500);
+    return () => clearInterval(interval);
+  }, [selectedIncidentId, selectedIncident?.status, currentUser]);
+
+  const handleLogout = () => {
+    auth.logout();
+    setCurrentUser(null);
+    setSelectedIncidentId(null);
+    setSelectedIncident(null);
+  };
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    if (user.role === 'employee') {
+      setActiveTab('my-tickets');
+    } else {
+      setActiveTab('incidents');
+    }
+  };
+
+  // If not logged in, show modern Login screen
+  if (!currentUser) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'support_engineer';
+
+  // Trigger Autonomous Agent on Incident (Admin only)
   const handleTriggerAgent = async (id) => {
     setIsProcessing(true);
     try {
@@ -73,7 +103,7 @@ export default function App() {
     }
   };
 
-  // Handle Human-in-the-Loop Approval
+  // Handle Human-in-the-Loop Approval (Admin only)
   const handleApproveAction = async (id, approved, feedback) => {
     setIsProcessing(true);
     try {
@@ -88,8 +118,11 @@ export default function App() {
   };
 
   // Create Incident
-  const handleCreateIncident = async (data, autoTrigger) => {
-    const newInc = await api.createIncident(data);
+  const handleCreateIncident = async (data) => {
+    const newInc = await api.createIncident({
+      ...data,
+      reporter_email: data.reporter_email || currentUser.email || 'employee@enterprise.io'
+    });
     await fetchIncidents();
     setSelectedIncidentId(newInc.id);
     setActiveTab('incidents');
@@ -98,14 +131,12 @@ export default function App() {
   // Quick Demo Simulator
   const handleSimulateDemo = async () => {
     try {
-      // 1. Trigger failure in simulator
       await api.simulateFailure('http_500_gateway');
-      // 2. Create ticket
       const newInc = await api.createIncident({
         title: 'Application returning HTTP 500 errors. Cannot access checkout.',
         description: 'My application is returning HTTP 500 errors. I cannot access the application.',
         severity: 'P1_CRITICAL',
-        reporter_email: 'employee@enterprise.io',
+        reporter_email: currentUser.email || 'employee@enterprise.io',
       });
       await fetchIncidents();
       setSelectedIncidentId(newInc.id);
@@ -125,43 +156,59 @@ export default function App() {
         onOpenCreate={() => setIsCreateOpen(true)}
         onSimulateDemo={handleSimulateDemo}
         pendingApprovalsCount={pendingApprovalsCount}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {activeTab === 'incidents' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-            {/* Left Column: Incidents List */}
-            <div className="lg:col-span-5 h-[calc(100vh-140px)]">
-              <IncidentList
-                incidents={incidents}
-                selectedId={selectedIncidentId}
-                onSelectIncident={(id) => setSelectedIncidentId(id)}
-              />
+      {/* 👤 EMPLOYEE VIEW */}
+      {!isAdmin ? (
+        <main className="flex-1">
+          <EmployeePortal
+            user={currentUser}
+            incidents={incidents}
+            onRefresh={fetchIncidents}
+          />
+        </main>
+      ) : (
+        /* 🛡️ ADMIN / SRE VIEW */
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+          {activeTab === 'incidents' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+              {/* Left Column: Incidents List */}
+              <div className="lg:col-span-5 h-[calc(100vh-140px)]">
+                <IncidentList
+                  incidents={incidents}
+                  selectedId={selectedIncidentId}
+                  onSelectIncident={(id) => setSelectedIncidentId(id)}
+                />
+              </div>
+
+              {/* Right Column: Incident Studio & Agent Execution */}
+              <div className="lg:col-span-7 h-[calc(100vh-140px)] overflow-y-auto pr-1">
+                <IncidentDetail
+                  incident={selectedIncident}
+                  steps={incidentSteps}
+                  onTriggerAgent={handleTriggerAgent}
+                  onApproveAction={handleApproveAction}
+                  isProcessing={isProcessing}
+                />
+              </div>
             </div>
+          )}
 
-            {/* Right Column: Incident Studio & Agent Execution */}
-            <div className="lg:col-span-7 h-[calc(100vh-140px)] overflow-y-auto pr-1">
-              <IncidentDetail
-                incident={selectedIncident}
-                steps={incidentSteps}
-                onTriggerAgent={handleTriggerAgent}
-                onApproveAction={handleApproveAction}
-                isProcessing={isProcessing}
-              />
-            </div>
-          </div>
-        )}
+          {activeTab === 'infra' && <InfraSimulator />}
+          {activeTab === 'knowledge' && <KnowledgeBase />}
+          {activeTab === 'analytics' && <AnalyticsDashboard />}
+        </main>
+      )}
 
-        {activeTab === 'infra' && <InfraSimulator />}
-        {activeTab === 'knowledge' && <KnowledgeBase />}
-        {activeTab === 'analytics' && <AnalyticsDashboard />}
-      </main>
-
-      <CreateIncidentModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onCreate={handleCreateIncident}
-      />
+      {isAdmin && (
+        <CreateIncidentModal
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          onCreate={handleCreateIncident}
+        />
+      )}
     </div>
   );
 }

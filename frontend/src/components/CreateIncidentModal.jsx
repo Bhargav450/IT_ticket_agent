@@ -13,22 +13,40 @@ export default function CreateIncidentModal({ isOpen, onClose, onCreate }) {
 
   const presets = [
     {
-      label: 'HTTP 500 Gateway Outage',
+      label: 'UC-1: HTTP 500 Gateway Outage',
       title: 'Application returning HTTP 500 errors - users unable to access app',
       description: 'My application is returning HTTP 500 errors. I cannot access the application.',
       severity: 'P1_CRITICAL',
     },
     {
-      label: 'DB Pool Saturated',
+      label: 'UC-2: DB Pool Saturated',
       title: 'Database connection pool exhausted during checkout surge',
       description: 'Order database queries failing with OperationalError: remaining connection slots are reserved for non-replication superuser connections. QueuePool limit of size 50 reached.',
       severity: 'P2_HIGH',
     },
     {
-      label: 'Auth 401 Token Spike',
+      label: 'UC-3: Auth 401 Token Spike',
       title: 'Users logged out randomly with 401 Unauthorized',
       description: 'Multiple employees reported getting kicked out of internal dashboards with JWT signature verification errors.',
       severity: 'P2_HIGH',
+    },
+    {
+      label: 'UC-4: Redis Cache Latency Spike',
+      title: 'Redis cache memory saturation causing high latency and cache misses',
+      description: 'Redis memory at 95%. Maxmemory LRU key eviction policy thrashing, causing elevated latency and dropped cache keys.',
+      severity: 'P3_MEDIUM',
+    },
+    {
+      label: 'UC-5: Payment 504 Timeout',
+      title: 'Payment gateway timing out with HTTP 504 on Stripe webhook',
+      description: 'Card authorization failing on checkout. Payment worker thread deadlock and upstream provider timeout after 30000ms.',
+      severity: 'P1_CRITICAL',
+    },
+    {
+      label: 'UC-6: Enterprise IT VPN Inquiry',
+      title: 'How do I configure GlobalProtect VPN and SSH access keys?',
+      description: 'Need setup guidance for corporate VPN client on Mac and submitting public SSH key for staging cluster.',
+      severity: 'P4_LOW',
     },
   ];
 

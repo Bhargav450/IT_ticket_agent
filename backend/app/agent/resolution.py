@@ -14,31 +14,60 @@ def resolution_node(state: ITSupportState) -> Dict[str, Any]:
     service = state.get("affected_service", "api-gateway")
     root_cause = state.get("root_cause", "")
     
-    # 1. Determine troubleshooting action accurately based on service & fault
-    if "order-db" in service or ("database" in root_cause.lower() and "pool" in root_cause.lower()):
-        target_service = "order-db"
-        action_type = "flush_connection_pool"
-        is_risky = True
-        risk_justification = "Flushing database pool terminates idle worker sessions and resets connection limits. Human sign-off required to prevent active query aborts."
-        proposed_action = f"execute_flush_db_pool(database_name='{target_service}')"
-    elif "api-gateway" in service or "500" in root_cause or "deadlock" in root_cause.lower():
-        target_service = "api-gateway"
-        action_type = "restart_service"
-        is_risky = True
-        risk_justification = f"Restarting service '{target_service}' recycles worker threads and clears deadlock sockets. Brief 5-10s packet drop may occur. Requires human authorization."
-        proposed_action = f"execute_service_restart(service_name='{target_service}')"
-    elif "auth-service" in service or "jwks" in root_cause.lower():
-        target_service = "auth-service"
-        action_type = "restart_service"
-        is_risky = True
-        risk_justification = f"Restarting '{target_service}' forces re-fetching of latest JWKS keys. Requires human authorization."
-        proposed_action = f"execute_service_restart(service_name='{target_service}')"
-    else:
-        target_service = service
-        action_type = "clear_cache"
+    category = state.get("category", "APPLICATION")
+    rag_context = "\n".join([c.get("excerpt", "") for c in state.get("rag_citations", [])])
+    
+    # Safe autonomous handling for general IT or policy inquiries
+    if category == "GENERAL_IT" or service == "enterprise-it":
+        action_type = "provide_guidance"
+        target_service = "enterprise-it"
         is_risky = False
-        risk_justification = "Low risk cache purge."
-        proposed_action = f"clear_cache(service_name='{target_service}')"
+        risk_justification = "Informational support query; no infrastructure mutation needed."
+        proposed_action = "provide_knowledge_guidance()"
+    else:
+        prompt = f"""
+        You are an expert IT Incident Resolution Agent.
+        Diagnosed Root Cause: {root_cause}
+        Impacted Service: {service}
+        Category: {category}
+        Runbook context: {rag_context}
+
+        Remediation Playbook Standards:
+        - restart_service: recycles worker processes, clears socket deadlocks, forces re-fetching of expired JWT/JWKS keys. (HIGH RISK - interrupts active sessions, requires human sign-off)
+        - flush_connection_pool: flushes database connections and kills idle sessions. (HIGH RISK - resets database slots)
+        - clear_cache: purges temporary cache memory to release memory pressure. (LOW RISK - safe automated operation)
+
+        Return strictly valid JSON:
+        {{
+          "action_type": "restart_service" | "flush_connection_pool" | "clear_cache",
+          "target_service": "{service}",
+          "is_risky": true | false,
+          "risk_justification": "explanation of operational risk",
+          "proposed_action": "command string"
+        }}
+        """
+        
+        from app.agent.llm_factory import llm_client
+        plan = llm_client.generate_json(prompt)
+        
+        action_type = plan.get("action_type") or "restart_service"
+        target_service = plan.get("target_service") or service
+        is_risky = bool(plan.get("is_risky", True))
+        risk_justification = plan.get("risk_justification", "Action evaluation completed by autonomous agent.")
+
+        # Canonicalize executable action commands
+        if action_type == "restart_service":
+            is_risky = True
+            proposed_action = f"execute_service_restart(service_name='{target_service}')"
+        elif action_type == "flush_connection_pool":
+            is_risky = True
+            proposed_action = f"execute_flush_db_pool(database_name='{target_service}')"
+        elif action_type == "clear_cache":
+            is_risky = False
+            proposed_action = f"clear_cache(service_name='{target_service}')"
+        else:
+            is_risky = True
+            proposed_action = f"execute_service_restart(service_name='{target_service}')"
 
     # 2. Check Human Approval Gate
     approval_status = state.get("human_approval_status")
@@ -121,6 +150,12 @@ def resolution_node(state: ITSupportState) -> Dict[str, Any]:
             exec_result = execute_service_restart(target_service)
         elif action_type == "flush_connection_pool":
             exec_result = execute_flush_db_pool(target_service)
+        elif action_type == "provide_guidance":
+            exec_result = {
+                "success": True, 
+                "action": "documentation_policy_guidance_provided",
+                "message": "Policy explanation provided. Employee guided to IT Exception Request portal."
+            }
         else:
             exec_result = clear_cache(target_service)
 
