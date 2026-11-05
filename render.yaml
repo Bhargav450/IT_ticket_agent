@@ -40,5 +40,5 @@ services:
         fromService:
           type: web
           name: aegisops-backend
-          property: host
+          envVarKey: RENDER_EXTERNAL_URL
 

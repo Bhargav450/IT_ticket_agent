@@ -64,7 +64,7 @@ export default function Login({ onLoginSuccess }) {
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-start gap-2.5 text-xs text-rose-400">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+              <span className="whitespace-pre-line">{error}</span>
             </div>
           )}
 

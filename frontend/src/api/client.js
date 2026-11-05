@@ -1,5 +1,22 @@
-const getApiBase = () => {
-  let raw = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+export const getApiBase = () => {
+  // 1. Check for user-defined runtime override in localStorage
+  const override = typeof window !== 'undefined' ? localStorage.getItem('AEGISOPS_API_URL') : null;
+  let raw = (override || import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+
+  // 2. Reject internal container / private network hostnames (e.g. 'aegisops-backend' or 'aegisops-backend:10000')
+  // Browsers cannot resolve these over the public internet.
+  if (raw && !raw.includes('.') && !raw.includes('localhost') && !raw.includes('127.0.0.1')) {
+    raw = '';
+  }
+
+  // 3. Fallback for Render deployments:
+  // If frontend is running at https://aegisops-frontend.onrender.com, target https://aegisops-backend.onrender.com
+  if (!raw && typeof window !== 'undefined' && window.location.hostname.endsWith('.onrender.com')) {
+    const parts = window.location.hostname.split('.');
+    const backendSubdomain = parts[0].replace('frontend', 'backend');
+    raw = `https://${backendSubdomain}.onrender.com`;
+  }
+
   if (!raw) return '/api';
   if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
     raw = `https://${raw}`;
@@ -7,7 +24,26 @@ const getApiBase = () => {
   return `${raw}/api`;
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
+
+if (typeof window !== 'undefined') {
+  console.log('[AegisOps] Connected to API Base:', API_BASE);
+}
+
+const safeFetch = async (url, options = {}) => {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    if (err.name === 'TypeError' || (err.message && err.message.toLowerCase().includes('fetch'))) {
+      throw new Error(
+        `Unable to connect to backend at ${url}. ` +
+        `If using Render free tier, the backend server spins down when idle and takes ~40 seconds to wake up. ` +
+        `Please check if the backend service is running or wait a moment and try again.`
+      );
+    }
+    throw err;
+  }
+};
 
 const safeJson = async (res) => {
   const text = await res.text();
@@ -15,7 +51,7 @@ const safeJson = async (res) => {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`Server returned unexpected response (${res.status}). If the backend is waking up, please retry in 15 seconds.`);
+    throw new Error(`Server returned unexpected response (Status: ${res.status}). If the backend is waking up, please retry in 15 seconds.`);
   }
 };
 
@@ -56,7 +92,7 @@ const getHeaders = (extra = {}) => {
 export const api = {
   // Auth
   async login(email, password) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await safeFetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -73,7 +109,7 @@ export const api = {
   // Incidents
   async getIncidents(status) {
     const url = status ? `${API_BASE}/incidents?status=${status}` : `${API_BASE}/incidents`;
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await safeFetch(url, { headers: getHeaders() });
     if (!res.ok) {
       const err = await safeJson(res);
       throw new Error(err?.detail || `Failed to fetch incidents (Status: ${res.status})`);
@@ -82,7 +118,7 @@ export const api = {
   },
 
   async getIncident(id) {
-    const res = await fetch(`${API_BASE}/incidents/${id}`, { headers: getHeaders() });
+    const res = await safeFetch(`${API_BASE}/incidents/${id}`, { headers: getHeaders() });
     if (!res.ok) {
       const err = await safeJson(res);
       throw new Error(err?.detail || `Failed to fetch incident (Status: ${res.status})`);
@@ -91,7 +127,7 @@ export const api = {
   },
 
   async createIncident(data) {
-    const res = await fetch(`${API_BASE}/incidents`, {
+    const res = await safeFetch(`${API_BASE}/incidents`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -104,7 +140,7 @@ export const api = {
   },
 
   async triggerAgent(id) {
-    const res = await fetch(`${API_BASE}/incidents/${id}/trigger-agent`, {
+    const res = await safeFetch(`${API_BASE}/incidents/${id}/trigger-agent`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -116,7 +152,7 @@ export const api = {
   },
 
   async approveAction(id, approved, feedback = '') {
-    const res = await fetch(`${API_BASE}/incidents/${id}/approve`, {
+    const res = await safeFetch(`${API_BASE}/incidents/${id}/approve`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ approved, feedback }),
@@ -129,21 +165,21 @@ export const api = {
   },
 
   async getIncidentSteps(id) {
-    const res = await fetch(`${API_BASE}/incidents/${id}/steps`, { headers: getHeaders() });
+    const res = await safeFetch(`${API_BASE}/incidents/${id}/steps`, { headers: getHeaders() });
     if (!res.ok) return [];
     return safeJson(res);
   },
 
   // Knowledge Base & RAG
   async getKnowledgeDocs() {
-    const res = await fetch(`${API_BASE}/knowledge`, { headers: getHeaders() });
+    const res = await safeFetch(`${API_BASE}/knowledge`, { headers: getHeaders() });
     if (!res.ok) return [];
     return safeJson(res);
   },
 
   async uploadKnowledgeDoc(formData) {
     const token = auth.getToken();
-    const res = await fetch(`${API_BASE}/knowledge/upload`, {
+    const res = await safeFetch(`${API_BASE}/knowledge/upload`, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,
@@ -156,7 +192,7 @@ export const api = {
   },
 
   async searchKnowledge(query) {
-    const res = await fetch(`${API_BASE}/knowledge/search`, {
+    const res = await safeFetch(`${API_BASE}/knowledge/search`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ query, limit: 3 }),
@@ -170,7 +206,7 @@ export const api = {
 
   // Infrastructure Simulator
   async getServices() {
-    const res = await fetch(`${API_BASE}/infra/services`, { headers: getHeaders() });
+    const res = await safeFetch(`${API_BASE}/infra/services`, { headers: getHeaders() });
     if (!res.ok) return [];
     return safeJson(res);
   },
@@ -179,13 +215,13 @@ export const api = {
     let url = `${API_BASE}/infra/logs?limit=40`;
     if (service) url += `&service=${service}`;
     if (level) url += `&level=${level}`;
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await safeFetch(url, { headers: getHeaders() });
     if (!res.ok) return [];
     return safeJson(res);
   },
 
   async simulateFailure(scenario) {
-    const res = await fetch(`${API_BASE}/infra/simulate-failure`, {
+    const res = await safeFetch(`${API_BASE}/infra/simulate-failure`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ scenario }),
@@ -198,7 +234,7 @@ export const api = {
   },
 
   async resetInfra() {
-    const res = await fetch(`${API_BASE}/infra/reset`, {
+    const res = await safeFetch(`${API_BASE}/infra/reset`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -211,13 +247,13 @@ export const api = {
 
   // Analytics & Benchmark
   async getAnalytics() {
-    const res = await fetch(`${API_BASE}/analytics/summary`, { headers: getHeaders() });
+    const res = await safeFetch(`${API_BASE}/analytics/summary`, { headers: getHeaders() });
     if (!res.ok) return {};
     return safeJson(res);
   },
 
   async runAccuracyBenchmark() {
-    const res = await fetch(`${API_BASE}/analytics/benchmark/run`, {
+    const res = await safeFetch(`${API_BASE}/analytics/benchmark/run`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -228,4 +264,3 @@ export const api = {
     return safeJson(res);
   },
 };
-
