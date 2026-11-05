@@ -11,20 +11,10 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-STOP_WORDS = {
-    "is", "in", "it", "my", "the", "a", "an", "to", "for", "of", "and", "or", "on",
-    "at", "by", "from", "with", "about", "as", "into", "like", "through", "after",
-    "over", "between", "out", "against", "during", "without", "before", "under", "around",
-    "this", "that", "these", "those", "i", "you", "he", "she", "we", "they", "me", "him",
-    "her", "us", "them", "what", "which", "who", "whom", "whose", "where", "when", "why",
-    "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such",
-    "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can", "will",
-    "just", "don", "should", "now"
-}
-
 def simple_tokenize(text: str) -> List[str]:
-    raw_tokens = re.findall(r'\b[a-zA-Z0-9_\-\.]+\b', text.lower())
-    return [t for t in raw_tokens if t not in STOP_WORDS and len(t) > 1]
+    """Tokenizes text into terms without any hardcoded stop word lists.
+    BM25 Inverse Document Frequency (IDF) dynamically downweights common words automatically."""
+    return [t for t in re.findall(r'\b[a-zA-Z0-9_\-\.]+\b', text.lower()) if len(t) > 1]
 
 def compute_term_vector(text: str) -> Dict[str, float]:
     tokens = simple_tokenize(text)

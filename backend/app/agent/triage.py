@@ -6,15 +6,53 @@ from app.core.database import SessionLocal
 from app.models.audit import AgentStepLog
 
 def triage_node(state: ITSupportState) -> Dict[str, Any]:
-    """Triage Agent: Evaluates ticket title and description, extracts affected service, and assigns severity."""
+    """Triage Agent: Evaluates ticket title and description, queries vector DB for matching SOPs, and grounds severity in knowledge base."""
     title = state.get("title", "")
     desc = state.get("description", "")
     
+    # 1. Search the Vector Database for matching SOPs & Runbooks
+    db = SessionLocal()
+    matched_runbook = None
+    runbook_severity = None
+    citations = []
+    try:
+        from app.services.rag_engine import rag_engine
+        citations = rag_engine.search(db, f"{title} {desc}", limit=2)
+        if citations and citations[0].similarity_score >= 0.10:
+            matched_runbook = citations[0]
+            excerpt_lower = matched_runbook.excerpt.lower()
+            fname_lower = matched_runbook.filename.lower()
+            if "p4_low" in excerpt_lower or "p4" in excerpt_lower or "general_it" in fname_lower:
+                runbook_severity = "P4_LOW"
+            elif "p1_critical" in excerpt_lower or "p1" in excerpt_lower:
+                runbook_severity = "P1_CRITICAL"
+            elif "p2_high" in excerpt_lower or "p2" in excerpt_lower:
+                runbook_severity = "P2_HIGH"
+            elif "p3_medium" in excerpt_lower or "p3" in excerpt_lower:
+                runbook_severity = "P3_MEDIUM"
+    finally:
+        db.close()
+
+    runbook_context = ""
+    if matched_runbook:
+        runbook_context = f"""
+    MATCHED RUNBOOK FROM VECTOR DATABASE:
+    - Runbook Title: {matched_runbook.document_title} (File: {matched_runbook.filename})
+    - Database Prescribed Severity: {runbook_severity or 'Refer to excerpt'}
+    - Knowledge Base Guidance:
+      {matched_runbook.excerpt}
+
+    GROUNDING CONSTRAINT:
+    You MUST align severity, affected service, and category strictly with the matched runbook from the database.
+    Do NOT invent, escalate, or hallucinate a severity that conflicts with the database runbook.
+    """
+
     prompt = f"""
     You are an expert IT Incident Triage Agent in an enterprise Site Reliability Engineering center.
     Analyze this incident report:
     Title: {title}
     Description: {desc}
+    {runbook_context}
 
     Enterprise ITIL Severity Standards:
     - P1_CRITICAL: Complete internal infrastructure outage, revenue blocker, checkout failure, customer-facing down (e.g. HTTP 500 error cascade on api-gateway, HTTP 504 checkout failure on payment-gateway).
@@ -42,7 +80,7 @@ def triage_node(state: ITSupportState) -> Dict[str, Any]:
       "severity": "P1_CRITICAL" | "P2_HIGH" | "P3_MEDIUM" | "P4_LOW",
       "category": "APPLICATION" | "DATABASE" | "AUTHENTICATION" | "INFRASTRUCTURE" | "GENERAL_IT",
       "affected_service": "api-gateway" | "order-db" | "auth-service" | "payment-gateway" | "redis-cache" | "enterprise-it",
-      "reasoning": "brief explanation"
+      "reasoning": "brief explanation citing matched runbook"
     }}
     """
     
@@ -75,6 +113,20 @@ def triage_node(state: ITSupportState) -> Dict[str, Any]:
 
     service = str(result.get("affected_service", "enterprise-it")).lower().strip()
     reasoning = result.get("reasoning", "Classified dynamically by autonomous agent.")
+
+    # Strict Grounding Check: If vector DB explicitly prescribes a severity for this matched SOP,
+    # prevent LLM hallucination from overriding the knowledge base ground truth
+    if runbook_severity:
+        title_lower = (title + " " + desc).lower()
+        has_critical_tokens = any(w in title_lower for w in ["outage", "500", "504", "deadlock", "down", "failover"])
+        if runbook_severity == "P4_LOW" and not has_critical_tokens:
+            severity = "P4_LOW"
+            category = "GENERAL_IT"
+            service = "enterprise-it"
+            reasoning = f"Grounded strictly via Vector DB SOP '{matched_runbook.document_title}' (Severity: P4_LOW)."
+        elif runbook_severity == "P1_CRITICAL" and any(w in title_lower for w in ["500", "504", "outage", "deadlock", "payment", "checkout"]):
+            severity = "P1_CRITICAL"
+            reasoning = f"Grounded strictly via Vector DB SOP '{matched_runbook.document_title}' (Severity: P1_CRITICAL)."
 
     # Persist audit step
     db = SessionLocal()
