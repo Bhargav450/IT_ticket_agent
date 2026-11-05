@@ -17,9 +17,9 @@ services:
       - key: ZAMMAD_URL
         value: http://localhost:8080
       - key: ZAMMAD_TOKEN
-        sync: false
+        value: ""
       - key: OPENAI_API_KEY
-        sync: false
+        value: ""
       - key: GROQ_API_KEY
         sync: false
       - key: OLLAMA_BASE_URL
