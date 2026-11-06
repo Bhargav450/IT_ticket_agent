@@ -10,6 +10,12 @@ Standard operating procedures for non-incident IT inquiries, including VPN setup
 - **GlobalProtect VPN Setup**: Download the enterprise client from `https://vpn.enterprise.io`. Connect using your Okta SSO identity and hardware MFA key.
 - **MFA Token Desync**: Navigate to `https://id.enterprise.io/self-service/mfa` to re-enroll your authenticator app.
 - **SSH Key Onboarding**: Submit public ed25519 keys via the internal developer portal at `https://dev.enterprise.io/keys`.
+- **Account Lockout & Password Resets (Laptop / SSO)**:
+  - If an employee account is locked due to multiple failed login attempts on a corporate laptop or managed device:
+    1. Navigate to the enterprise self-service unlock portal at `https://id.enterprise.io/self-service/unlock`.
+    2. Complete secondary identity verification via registered mobile authenticator or SMS MFA.
+    3. If self-service is unavailable or the device is offline, IT Service Desk verifies employee identity via manager confirmation and issues an authorized temporary unlock token.
+    4. Verify whether stored or stale credentials (e.g., mapped network drives, expired Wi-Fi profiles) are causing repeated automatic lockouts.
 - **Corporate Web Filtering & Blocked Websites (e.g. YouTube, Streaming Media)**:
   - Video streaming platforms (including `youtube.com`) and social media are restricted by default on corporate networks and VPN under the Enterprise Acceptable Use & Content Filtering Policy (enforced by Zscaler / Corporate Firewall).
   - This is an intentional security and bandwidth management policy, NOT an IT infrastructure failure.

@@ -23,15 +23,17 @@ def seed_database(db: Session):
     # 2. Seed Runbooks into RAG Knowledge Base
     runbook_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../runbooks"))
     if os.path.exists(runbook_dir):
-        for fname in os.listdir(runbook_dir):
+        from app.models.knowledge import DocumentChunk
+        for fname in sorted(os.listdir(runbook_dir)):
             if fname.endswith(".md"):
                 fpath = os.path.join(runbook_dir, fname)
                 title = fname.replace(".md", "").replace("_", " ").title()
                 
+                with open(fpath, "r", encoding="utf-8") as f:
+                    content = f.read()
+
                 existing = db.query(KnowledgeDocument).filter(KnowledgeDocument.filename == fname).first()
                 if not existing:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        content = f.read()
                     rag_engine.ingest_document(
                         db=db,
                         filename=fname,
@@ -39,6 +41,32 @@ def seed_database(db: Session):
                         category="RUNBOOK",
                         content=content
                     )
+                elif existing.content != content:
+                    existing.content = content
+                    # Remove old chunks and re-chunk with updated content
+                    db.query(DocumentChunk).filter(DocumentChunk.document_id == existing.id).delete()
+                    chunks = rag_engine.chunk_text(content)
+                    for idx, chunk in enumerate(chunks):
+                        lines = [l.strip() for l in chunk.splitlines() if l.strip()]
+                        section_name = "General"
+                        for l in lines:
+                            if l.startswith("#"):
+                                section_name = l.lstrip("#").strip()
+                                break
+                        c_emb = rag_engine.get_embedding_vector(chunk)
+                        db_chunk = DocumentChunk(
+                            document_id=existing.id,
+                            chunk_index=idx,
+                            content=chunk,
+                            metadata_json={
+                                "filename": fname,
+                                "title": title,
+                                "section": section_name
+                            },
+                            embedding=c_emb
+                        )
+                        db.add(db_chunk)
+                    db.commit()
 
     # 3. Seed Sample Initial Incidents
     sample_incidents = [

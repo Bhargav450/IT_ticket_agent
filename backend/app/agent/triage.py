@@ -63,17 +63,17 @@ def triage_node(state: ITSupportState) -> Dict[str, Any]:
     Enterprise Technical Categories:
     - APPLICATION: Internal company services and APIs (checkout, order processing, internal web portals).
     - DATABASE: PostgreSQL, connection pools, SQL deadlocks, queries.
-    - AUTHENTICATION: JWT tokens, JWKS keys, login, session validation, SSO.
+    - AUTHENTICATION: Internal backend auth microservice, JWT signing tokens, JWKS public keys, service-to-service 401 cascades.
     - INFRASTRUCTURE: Caching tiers (Redis), CPU/memory saturation, container nodes.
-    - GENERAL_IT: Employee workspace, laptop issues, VPN, corporate web filtering, blocked websites/URLs (streaming media, external services), access requests, IT policy inquiries.
+    - GENERAL_IT: Employee workspace, laptop issues, account lockout, password reset, sign-in to managed devices, VPN, corporate web filtering, blocked websites/URLs (streaming media, external services), access requests, IT policy inquiries.
 
     Service Mapping Rules:
     - api-gateway: HTTP 500 Internal Server Error, internal backend application down, routing failure.
     - order-db: Database connection timeouts, SQL errors, connection pool exhaustion.
-    - auth-service: JWT verification, authentication tokens, 401 Unauthorized.
+    - auth-service: Internal JWT verification microservice, backend auth tokens, JWKS key rotation errors, 401 Unauthorized API cascade.
     - payment-gateway: Credit card authorization failure, payment 504 timeout on Stripe.
     - redis-cache: Cache memory saturation, Redis OOM eviction.
-    - enterprise-it: VPN setup, employee workspace, corporate web filtering, blocked websites or URLs, access requests.
+    - enterprise-it: Employee workspace, laptop sign-in, account lockout, password reset, VPN setup, corporate web filtering, blocked websites or URLs, access requests.
 
     Return strictly valid JSON:
     {{

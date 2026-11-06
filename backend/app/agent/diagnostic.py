@@ -26,8 +26,8 @@ def diagnostic_node(state: ITSupportState) -> Dict[str, Any]:
         findings["db_diagnostics"] = db_diag
     
     citations = state.get("rag_citations", [])
+    rag_context = "\n\n".join([c.get("excerpt", "") for c in citations if c.get("excerpt")])
     primary_citation = citations[0] if citations else None
-    rag_context = primary_citation.get("excerpt", "") if primary_citation else ""
     
     if category == "GENERAL_IT" or service == "enterprise-it":
         prompt = f"""
@@ -78,27 +78,37 @@ def diagnostic_node(state: ITSupportState) -> Dict[str, Any]:
         if not root_cause or len(root_cause) < 10 or not resolution_guidance or len(resolution_guidance) < 15:
             if rag_context:
                 content_lines = [l.strip() for l in rag_context.splitlines() if l.strip()]
-                header = content_lines[0] if content_lines else "Enterprise IT Runbook"
+                raw_hdr = content_lines[0] if content_lines else "Enterprise IT Runbook"
+                header = raw_hdr.lstrip("-*# ").rstrip(":").replace("**", "")
                 
-                # Extract actionable procedure and guidance lines dynamically from the retrieved document
-                actionable_lines = [
-                    l for l in content_lines[1:]
-                    if any(l.lower().startswith(k) or k in l.lower() for k in [
-                        "diagnosis:", "resolution:", "verification:", "procedure",
-                        "steps:", "1.", "2.", "3.", "check ", "confirm ", "verify ", "- "
+                # Extract diagnostic finding or symptom line dynamically
+                diag_candidates = [
+                    l for l in content_lines
+                    if any(l.lower().startswith(k) or (":" in l and k in l.lower().split(":")[0]) for k in [
+                        "diagnosis", "report", "root cause", "symptom", "issue"
                     ])
                 ]
-                
-                if not root_cause or len(root_cause) < 10:
+                diag_preferred = [l for l in diag_candidates if "diagnosis:" in l.lower()]
+                target_diag = diag_preferred[0] if diag_preferred else (diag_candidates[0] if diag_candidates else "")
+
+                if target_diag:
+                    diag_clean = target_diag.lstrip("-*# ").replace("**", "")
+                    root_cause = f"{header}: {diag_clean}"
+                elif not root_cause or len(root_cause) < 10:
                     root_cause = f"{header}: Issue matched with enterprise support playbook."
                 
-                if not resolution_guidance or len(resolution_guidance) < 15:
-                    if actionable_lines:
-                        resolution_guidance = "\n".join(actionable_lines[:5])
-                    elif len(content_lines) > 1:
-                        resolution_guidance = "\n".join(content_lines[1:5])
-                    else:
-                        resolution_guidance = "Follow the standard resolution procedures outlined in the enterprise runbook."
+                # Extract actionable resolution & verification steps dynamically
+                resolution_candidates = [
+                    l for l in content_lines
+                    if any(l.lower().startswith(k) or (":" in l and k in l.lower().split(":")[0]) for k in [
+                        "resolution", "verification", "remediation", "action", "1.", "2.", "3.", "4.", "5.", "- ", "direct ", "navigate ", "follow "
+                    ]) and not any(k == l.lower().strip() for k in ["procedure and guidance", "worked example", "operational note"])
+                ]
+
+                if resolution_candidates:
+                    resolution_guidance = "\n".join(resolution_candidates[:5])
+                elif not resolution_guidance or len(resolution_guidance) < 15:
+                    resolution_guidance = "\n".join(content_lines[1:5]) if len(content_lines) > 1 else "Follow the standard resolution procedures outlined in the enterprise runbook."
             else:
                 root_cause = "IT guidance inquiry analyzed."
                 resolution_guidance = "Follow standard enterprise IT support verification procedures."

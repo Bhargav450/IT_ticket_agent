@@ -132,10 +132,31 @@ class RAGEngine:
                 is_separator_regex=False,
                 separators=["\n\n", "\n", ". ", " ", ""]
             )
-            return [c.strip() for c in splitter.split_text(text) if c.strip()]
+            raw_chunks = [c.strip() for c in splitter.split_text(text) if c.strip()]
+        else:
+            raw_chunks = self._native_recursive_split(text, chunk_size, chunk_overlap)
 
-        # Native fallback recursive splitter
-        return self._native_recursive_split(text, chunk_size, chunk_overlap)
+        # Merge tiny header fragments (< 80 chars) to prevent IDF / Cosine distortion
+        merged: List[str] = []
+        buf = ""
+        for c in raw_chunks:
+            if len(c) < 80:
+                buf = (buf + "\n\n" + c) if buf else c
+                if len(buf) >= 80:
+                    merged.append(buf)
+                    buf = ""
+            else:
+                if buf:
+                    merged.append(buf + "\n\n" + c)
+                    buf = ""
+                else:
+                    merged.append(c)
+        if buf:
+            if merged:
+                merged[-1] = merged[-1] + "\n\n" + buf
+            else:
+                merged.append(buf)
+        return merged
 
     def _native_recursive_split(self, text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         separators = ["\n\n", "\n", ". ", " ", ""]
@@ -256,7 +277,7 @@ class RAGEngine:
                 filename=meta.get("filename", "runbook.md"),
                 section=meta.get("section", "Remediation Procedures"),
                 similarity_score=round(score, 3),
-                excerpt=c.content[:400] + ("..." if len(c.content) > 400 else "")
+                excerpt=c.content.strip()
             ))
         return results
 

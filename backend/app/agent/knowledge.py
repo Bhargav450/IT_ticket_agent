@@ -12,7 +12,10 @@ def knowledge_node(state: ITSupportState) -> Dict[str, Any]:
     service = state.get("affected_service", "api-gateway")
     desc = state.get("description", "")
     
-    query = f"{service} {title} {desc}"
+    # Ground RAG search primarily on the employee problem description
+    query = f"{title} {desc}".strip()
+    if not query:
+        query = service
     
     db = SessionLocal()
     try:
