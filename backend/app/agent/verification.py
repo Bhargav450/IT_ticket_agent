@@ -26,14 +26,10 @@ def verification_node(state: ITSupportState) -> Dict[str, Any]:
         rc = (state.get("root_cause") or "").strip()
         rg = (state.get("resolution_guidance") or "").strip()
 
-        full_query = f"{state.get('title', '')} {state.get('description', '')}".lower()
-        is_blocked = any(k in full_query for k in ["youtube", "blocked", "filtering", "filter", "streaming"])
-
-        if is_blocked:
-            rc = "Access to YouTube is restricted under the corporate Web Filtering & Acceptable Use Policy."
-            rg = "This is an intentional security policy, not a technical outage. To request access for work purposes, submit a URL Category Exception ticket with your manager's sign-off."
-        elif not rg:
-            rg = "Provided enterprise runbook policy guidance and self-service request procedure."
+        if not rc:
+            rc = "Enterprise IT inquiry evaluated against operational runbook."
+        if not rg:
+            rg = "Followed documented standard operating procedure."
 
         thought = f"Informational inquiry for '{service}' fulfilled with corporate policy runbook. No infrastructure probe required."
         summary = (

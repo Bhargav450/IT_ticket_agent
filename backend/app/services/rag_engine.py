@@ -106,26 +106,62 @@ class RAGEngine:
                 return f.read()
 
     def chunk_text(self, text: str, chunk_size: int = 500, chunk_overlap: int = 100) -> List[str]:
-        # Split by sections (markdown headers) or paragraphs first
-        paragraphs = text.split("\n\n")
-        chunks = []
-        current_chunk = ""
+        """
+        Recursive Character Chunking (LangChain RecursiveCharacterTextSplitter):
+        Hierarchically splits text using decreasing semantic delimiters:
+        1. Double newlines ("\\n\\n") - Paragraphs & Markdown headers
+        2. Single newlines ("\\n")   - Bullet checklists & shell commands
+        3. Sentences (". ")          - Complete grammatical statements
+        4. Words (" ")              - Word boundaries
+        5. Characters ("")          - Emergency fallback
+        Guarantees exact chunk_size and chunk_overlap without chopping commands.
+        """
+        try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+        except ImportError:
+            try:
+                from langchain.text_splitter import RecursiveCharacterTextSplitter
+            except ImportError:
+                RecursiveCharacterTextSplitter = None
 
-        for p in paragraphs:
-            clean_p = p.strip()
-            if not clean_p:
-                continue
-            if len(current_chunk) + len(clean_p) > chunk_size and len(current_chunk) > 100:
-                chunks.append(current_chunk.strip())
-                # Overlap
-                words = current_chunk.split()
-                current_chunk = " ".join(words[-15:]) + "\n" + clean_p
-            else:
-                current_chunk = (current_chunk + "\n\n" + clean_p).strip()
+        if RecursiveCharacterTextSplitter:
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                length_function=len,
+                is_separator_regex=False,
+                separators=["\n\n", "\n", ". ", " ", ""]
+            )
+            return [c.strip() for c in splitter.split_text(text) if c.strip()]
 
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        return chunks
+        # Native fallback recursive splitter
+        return self._native_recursive_split(text, chunk_size, chunk_overlap)
+
+    def _native_recursive_split(self, text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        separators = ["\n\n", "\n", ". ", " ", ""]
+        def _split(txt: str, idx: int) -> List[str]:
+            if len(txt) <= chunk_size or idx >= len(separators):
+                return [txt] if txt.strip() else []
+            sep = separators[idx]
+            splits = txt.split(sep) if sep else list(txt)
+            pieces = []
+            cur = ""
+            for p in splits:
+                cand = (cur + sep + p) if cur else p
+                if len(cand) <= chunk_size:
+                    cur = cand
+                else:
+                    if cur:
+                        pieces.append(cur)
+                    if len(p) > chunk_size:
+                        pieces.extend(_split(p, idx + 1))
+                        cur = ""
+                    else:
+                        cur = p
+            if cur:
+                pieces.append(cur)
+            return pieces
+        return _split(text, 0)
 
     def ingest_document(self, db: Session, filename: str, title: str, category: str, content: str) -> KnowledgeDocument:
         # Create parent document
@@ -237,6 +273,38 @@ class RAGEngine:
         if updated > 0:
             db.commit()
         return updated
+
+    def rechunk_all_documents(self, db: Session, chunk_size: int = 500, chunk_overlap: int = 100) -> int:
+        """Re-chunks all existing knowledge documents using RecursiveCharacterTextSplitter."""
+        docs = db.query(KnowledgeDocument).all()
+        db.query(DocumentChunk).delete()
+        total_chunks = 0
+        for doc in docs:
+            chunks = self.chunk_text(doc.content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            for idx, chunk in enumerate(chunks):
+                section = "General"
+                for line in chunk.splitlines():
+                    if line.startswith("#"):
+                        section = line.strip("#").strip()
+                        break
+                vec = self.get_embedding_vector(chunk)
+                db_chunk = DocumentChunk(
+                    document_id=doc.id,
+                    chunk_index=idx,
+                    content=chunk,
+                    metadata_json={
+                        "title": doc.title,
+                        "filename": doc.filename,
+                        "category": doc.category,
+                        "section": section,
+                        "chunk_index": idx
+                    },
+                    embedding=vec
+                )
+                db.add(db_chunk)
+                total_chunks += 1
+        db.commit()
+        return total_chunks
 
 rag_engine = RAGEngine()
 

@@ -181,16 +181,23 @@ class LLMClient:
 
                 if error_match:
                     rca = f"Telemetry failure detected: {error_match.group(1)}"
+                    guidance = "Investigate error telemetry trace on target microservice."
                     conf = 0.95
                 elif top_citation:
-                    rca = f"Root cause correlated with runbook '{top_citation.document_title}': {top_citation.section}. {top_citation.excerpt[:160]}..."
-                    conf = 0.91
+                    citation_lines = [l.strip() for l in top_citation.excerpt.splitlines() if l.strip()]
+                    hdr = citation_lines[0] if citation_lines else top_citation.document_title
+                    action_steps = [l for l in citation_lines if any(l.lower().startswith(k) for k in ["diagnosis:", "resolution:", "verification:", "procedure", "- ", "1.", "2."])]
+                    rca = f"Issue correlated with '{hdr}': Authentication restriction or operational playbook match."
+                    guidance = "\n".join(action_steps[:4]) if action_steps else (top_citation.excerpt[:250] + "...")
+                    conf = 0.92
                 else:
                     rca = "Technical degradation identified based on live service metrics and latency."
+                    guidance = "Follow standard operational triage procedures."
                     conf = 0.85
 
                 return json.dumps({
                     "root_cause": rca,
+                    "resolution_guidance": guidance,
                     "confidence": conf,
                     "primary_fault": rca.split(":")[0] if ":" in rca else "Operational Alert"
                 })

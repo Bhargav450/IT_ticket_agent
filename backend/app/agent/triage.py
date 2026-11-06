@@ -58,14 +58,14 @@ def triage_node(state: ITSupportState) -> Dict[str, Any]:
     - P1_CRITICAL: Complete internal infrastructure outage, revenue blocker, checkout failure, customer-facing down (e.g. HTTP 500 error cascade on api-gateway, HTTP 504 checkout failure on payment-gateway).
     - P2_HIGH: Core system degraded, database connection pool exhaustion, authentication or token failure across users.
     - P3_MEDIUM: Performance degradation, elevated latency, high memory usage, cache eviction, partial performance issue.
-    - P4_LOW: Standard IT requests, how-to inquiries, access requests, VPN setup, blocked external websites or content filter policy inquiries (e.g. YouTube, media streaming), documentation requests.
+    - P4_LOW: Standard IT requests, how-to inquiries, access requests, VPN setup, blocked external websites or content filter policy inquiries (e.g. streaming media, external SaaS), documentation requests.
 
     Enterprise Technical Categories:
     - APPLICATION: Internal company services and APIs (checkout, order processing, internal web portals).
     - DATABASE: PostgreSQL, connection pools, SQL deadlocks, queries.
     - AUTHENTICATION: JWT tokens, JWKS keys, login, session validation, SSO.
     - INFRASTRUCTURE: Caching tiers (Redis), CPU/memory saturation, container nodes.
-    - GENERAL_IT: Employee workspace, laptop issues, VPN, corporate web filtering, blocked websites/URLs (YouTube, video/media streaming), access requests, IT policy inquiries.
+    - GENERAL_IT: Employee workspace, laptop issues, VPN, corporate web filtering, blocked websites/URLs (streaming media, external services), access requests, IT policy inquiries.
 
     Service Mapping Rules:
     - api-gateway: HTTP 500 Internal Server Error, internal backend application down, routing failure.
@@ -73,7 +73,7 @@ def triage_node(state: ITSupportState) -> Dict[str, Any]:
     - auth-service: JWT verification, authentication tokens, 401 Unauthorized.
     - payment-gateway: Credit card authorization failure, payment 504 timeout on Stripe.
     - redis-cache: Cache memory saturation, Redis OOM eviction.
-    - enterprise-it: VPN setup, employee workspace, corporate web filtering, blocked websites or URLs (e.g. YouTube, streaming media), access requests.
+    - enterprise-it: VPN setup, employee workspace, corporate web filtering, blocked websites or URLs, access requests.
 
     Return strictly valid JSON:
     {{

@@ -25,7 +25,9 @@ def diagnostic_node(state: ITSupportState) -> Dict[str, Any]:
         db_diag = query_db_diagnostics("order-db")
         findings["db_diagnostics"] = db_diag
     
-    rag_context = "\n".join([c.get("excerpt", "") for c in state.get("rag_citations", [])])
+    citations = state.get("rag_citations", [])
+    primary_citation = citations[0] if citations else None
+    rag_context = primary_citation.get("excerpt", "") if primary_citation else ""
     
     if category == "GENERAL_IT" or service == "enterprise-it":
         prompt = f"""
@@ -33,18 +35,19 @@ def diagnostic_node(state: ITSupportState) -> Dict[str, Any]:
         Analyze this employee request or inquiry:
         Title: {state.get('title', '')}
         Description: {state.get('description', '')}
-        Relevant IT Runbook Context: {rag_context}
+        Relevant IT Runbook Context:
+        {rag_context}
 
-        Provide clear root cause identification and resolution guidance based strictly on the runbook context.
-        If this inquiry is about a blocked website or service (e.g. YouTube, media streaming), identify the exact policy restriction: e.g. "Access to YouTube is restricted under the corporate Web Filtering & Acceptable Use Policy."
-        And provide the self-service exception procedure in resolution_guidance: e.g. "This is an intentional security policy, not a technical outage. To request access for work purposes, submit a URL Category Exception ticket with your manager's sign-off."
+        Provide clear root cause identification and actionable resolution guidance based strictly on the runbook context above.
+        Extract the exact diagnostic checks, causes, and approved resolution steps described in the runbook.
+        Do not invent hypothetical facts or use generic placeholders.
 
         Return strictly valid JSON:
         {{
-          "root_cause": "clear, professional explanation of the policy or IT setup topic",
-          "resolution_guidance": "actionable self-service instructions or exception request procedure",
+          "root_cause": "clear, professional explanation of the issue or topic from the runbook",
+          "resolution_guidance": "actionable step-by-step instructions or resolution procedure from the runbook",
           "confidence": 0.95,
-          "primary_fault": "Enterprise IT Policy"
+          "primary_fault": "Enterprise IT Policy / Support"
         }}
         """
     else:
@@ -71,22 +74,34 @@ def diagnostic_node(state: ITSupportState) -> Dict[str, Any]:
     resolution_guidance = llm_res.get("resolution_guidance", "")
     confidence = float(llm_res.get("confidence", 0.9))
     
-    full_text = f"{state.get('title', '')} {state.get('description', '')}".lower()
-    is_blocked_query = any(k in full_text for k in ["youtube", "blocked", "filtering", "filter", "streaming"])
-
     if category == "GENERAL_IT" or service == "enterprise-it":
-        if is_blocked_query:
-            if not root_cause or "restricted" not in root_cause.lower():
-                root_cause = "Access to YouTube is restricted under the corporate Web Filtering & Acceptable Use Policy."
-            if not resolution_guidance or "exception" not in resolution_guidance.lower():
-                resolution_guidance = "This is an intentional security policy, not a technical outage. To request access for work purposes, submit a URL Category Exception ticket with your manager's sign-off."
-        elif not root_cause or len(root_cause) < 10:
+        if not root_cause or len(root_cause) < 10 or not resolution_guidance or len(resolution_guidance) < 15:
             if rag_context:
-                root_cause = f"Enterprise IT inquiry addressed via official IT runbook: {rag_context.strip().splitlines()[0]}"
+                content_lines = [l.strip() for l in rag_context.splitlines() if l.strip()]
+                header = content_lines[0] if content_lines else "Enterprise IT Runbook"
+                
+                # Extract actionable procedure and guidance lines dynamically from the retrieved document
+                actionable_lines = [
+                    l for l in content_lines[1:]
+                    if any(l.lower().startswith(k) or k in l.lower() for k in [
+                        "diagnosis:", "resolution:", "verification:", "procedure",
+                        "steps:", "1.", "2.", "3.", "check ", "confirm ", "verify ", "- "
+                    ])
+                ]
+                
+                if not root_cause or len(root_cause) < 10:
+                    root_cause = f"{header}: Issue matched with enterprise support playbook."
+                
+                if not resolution_guidance or len(resolution_guidance) < 15:
+                    if actionable_lines:
+                        resolution_guidance = "\n".join(actionable_lines[:5])
+                    elif len(content_lines) > 1:
+                        resolution_guidance = "\n".join(content_lines[1:5])
+                    else:
+                        resolution_guidance = "Follow the standard resolution procedures outlined in the enterprise runbook."
             else:
                 root_cause = "IT guidance inquiry analyzed."
-            if not resolution_guidance:
-                resolution_guidance = "Please follow the standard enterprise IT self-service procedure."
+                resolution_guidance = "Follow standard enterprise IT support verification procedures."
     elif not root_cause or len(root_cause) < 10:
         # Dynamically synthesize root cause from real telemetry evidence
         error_logs = [l for l in findings.get("logs", []) if l.get("level") in ["ERROR", "CRITICAL"]]
